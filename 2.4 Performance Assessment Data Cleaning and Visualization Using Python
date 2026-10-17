@@ -1,0 +1,63 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+student_id="cambel"
+print(student_id,datetime.now())
+
+
+df=pd.read_excel("AirBnBSummary_v2.xlsx")
+print("Duplicate rows before:",df.duplicated(subset=[c for c in df if c!="<StudentID>"]).sum())
+df=df.drop_duplicates(subset=[c for c in df if c!="<StudentID>"]).copy()
+print("Duplicate rows after:",df.duplicated().sum())
+print("Private room typos:",(df.room_type=="Private room").sum())
+df["room_type"]=df.room_type.replace({"Private room":"Private Room"})
+
+
+numeric=["price","minimum_nights","number_of_reviews","availability_365"]
+print("Missing before:",df[numeric].isna().sum())
+for c in numeric:
+ df[c]=pd.to_numeric(df[c],errors="coerce")
+ df[c]=df[c].fillna(df[c].median())
+print("Missing after:",df[numeric].isna().sum())
+
+
+for c in numeric:
+ q1,q3=df[c].quantile([.25,.75]); iqr=q3-q1
+ mask=(df[c]<q1-1.5*iqr)|(df[c]>q3+1.5*iqr)
+ print(c,"outliers before:",int(mask.sum()))
+ df.loc[mask,c]=df[c].median()
+ print(c,"outliers after:",int(((df[c]<q1-1.5*iqr)|(df[c]>q3+1.5*iqr)).sum()))
+df["<StudentID>"]=student_id
+df.to_excel("AirBnBSummary_v2_Python_Cleaned.xlsx",index=False)
+print(df.head(20).to_string(index=False))
+
+
+
+
+stats={"Total count":len(df),"Minimum price":df.price.min(),"Maximum price":df.price.max(),"Mean price":df.price.mean(),"Median reviews":df.number_of_reviews.median(),"Mode minimum
+nights":df.minimum_nights.mode()[0],"Price standard deviation":df.price.std(),"Price and availability correlation":df.price.corr(df.availability_365)}
+for k,v in stats.items(): print(k,":",v)
+
+
+
+
+
+plt.hist(df.number_of_reviews,bins=30);plt.title(f"Reviews Histogram - {student_id} - {datetime.now():%Y-%m-%d %H:%M}");plt.xlabel("Number of reviews");plt.ylabel("Listings");plt.show()
+
+
+
+df.minimum_nights.value_counts().sort_index().plot.bar(figsize=(12,5));plt.title(f"Minimum Nights - {student_id} - {datetime.now():%Y-%m-%d %H:%M}");plt.xlabel("Minimum nights");plt.ylabel("Listings");plt.show()
+
+
+
+x=np.arange(len(df));y=df.availability_365.to_numpy();plt.scatter(x,y,alpha=.3,s=8);plt.plot(x,np.polyval(np.polyfit(x,y,1),x),color="red");plt.title(f"Availability by Listing Order - {student_id} -
+{datetime.now():%Y-%m-%d %H:%M}");plt.xlabel("Listing index (not time)");plt.ylabel("Available days");plt.show()
+
+
+
+
+
+
+sns.heatmap(df[numeric].corr(),annot=True,cmap="coolwarm",vmin=-1,vmax=1);plt.title(f"Correlation Heat Map - {student_id} - {datetime.now():%Y-%m-%d %H:%M}");plt.show()
